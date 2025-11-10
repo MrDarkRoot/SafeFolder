@@ -1,0 +1,66 @@
+﻿using Safe1.Services;
+using System;
+using System.Threading.Tasks;
+using System.Windows.Input;
+
+namespace Safe1.ViewModels
+{
+    public class LoginViewModel : BaseViewModel
+    {
+        private string _masterPassword;
+        private string _errorMessage;
+
+        public string MasterPassword
+        {
+            get => _masterPassword;
+            set => SetProperty(ref _masterPassword, value);
+        }
+
+        public string ErrorMessage
+        {
+            get => _errorMessage;
+            set => SetProperty(ref _errorMessage, value);
+        }
+
+        public ICommand LoginCommand { get; }
+
+        private readonly AuthService _authService;
+
+        public event Action LoginSucceeded;
+
+        public LoginViewModel()
+        {
+            // Create DatabaseManager with retrieved DB key if available; otherwise pass empty
+            var dbKey = ConfigurationManager.RetrieveDatabaseKey();
+            var dbManager = new DatabaseManager(dbKey ?? string.Empty);
+            dbManager.InitializeDatabase();
+
+            _authService = new AuthService(dbManager);
+            LoginCommand = new RelayCommand(async (p) => await ExecuteLoginAsync(p));
+        }
+
+        private async Task ExecuteLoginAsync(object parameter)
+        {
+            string pass = parameter as string ?? MasterPassword;
+            if (string.IsNullOrEmpty(pass))
+            {
+                ErrorMessage = "Please enter your master password.";
+                return;
+            }
+
+            ErrorMessage = string.Empty;
+            bool ok = await _authService.VerifyMasterPasswordAsync(pass);
+            if (ok)
+            {
+                ErrorMessage = string.Empty;
+                // Notify MainWindow to navigate
+                LoginSucceeded?.Invoke();
+            }
+            else
+            {
+                // If not ok, show a generic error; AuthService already enforces delay
+                ErrorMessage = "Invalid password or access locked due to repeated failures.";
+            }
+        }
+    }
+}

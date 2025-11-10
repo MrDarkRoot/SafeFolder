@@ -1,0 +1,152 @@
+﻿using Safe1.Models;
+using Safe1.Services;
+using Safe1.Views;
+using System;
+using System.Collections.ObjectModel;
+using System.Threading.Tasks;
+using System.Windows.Input;
+using System.Linq;
+using System.Windows;
+
+namespace Safe1.ViewModels
+{
+    public class MainViewModel : BaseViewModel
+    {
+        public ObservableCollection<ProtectedFolderModel> ProtectedFolders { get; } = new ObservableCollection<ProtectedFolderModel>();
+
+        public ICommand AddFolderCommand { get; }
+        public ICommand HandleFolderActionCommand { get; }
+        public ICommand LockApplicationCommand { get; }
+        public ICommand OpenSettingsCommand { get; }
+
+        private readonly DatabaseManager _db;
+        private readonly SecureAccessService _secureAccess;
+
+        public MainViewModel()
+        {
+            var dbKey = ConfigurationManager.RetrieveDatabaseKey();
+            _db = new DatabaseManager(dbKey ?? string.Empty);
+            _db.InitializeDatabase();
+
+            ConfigurationManager.EnsureProtectedFolderTable(_db);
+
+            _secureAccess = SecureAccessService.CreateSecureWorkspace();
+
+            AddFolderCommand = new RelayCommand(async (p) => await ExecuteAddFolder());
+            HandleFolderActionCommand = new RelayCommand(async (p) => await ExecuteHandleAction(p));
+            LockApplicationCommand = new RelayCommand((p) => ExecuteLockApplication());
+            OpenSettingsCommand = new RelayCommand((p) => ExecuteOpenSettings());
+
+            LoadFoldersFromDb();
+        }
+
+        private void LoadFoldersFromDb()
+        {
+            var records = ConfigurationManager.GetProtectedFolderRecords(_db);
+            ProtectedFolders.Clear();
+            foreach (var r in records)
+            {
+                ProtectedFolders.Add(r);
+            }
+        }
+
+        private async Task ExecuteAddFolder()
+        {
+            var demoPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "NewProtectedFolder");
+            ConfigurationManager.AddProtectedFolder(_db, demoPath);
+            LoadFoldersFromDb();
+        }
+
+        private void ExecuteLockApplication()
+        {
+            // Trigger any UI navigation to Login
+        }
+
+        private void ExecuteOpenSettings()
+        {
+            // open settings dialog
+        }
+
+        private async Task ExecuteHandleAction(object parameter)
+        {
+            if (!(parameter is ProtectedFolderModel model)) return;
+
+            // default action if called via command
+            await HandleFolderActionWithTypeAsync("Action", model).ConfigureAwait(false);
+        }
+
+        public async Task HandleFolderActionWithTypeAsync(string action, ProtectedFolderModel model)
+        {
+            if (model == null) return;
+
+            if (action == "Lock")
+            {
+                if (model.ProtectionMode == ProtectionMode.NORMAL)
+                {
+                    try
+                    {
+                        var newPath = await QuickProtectService.QuickLockAsync(model.FolderPath).ConfigureAwait(false);
+                        ConfigurationManager.UpdateFolderPath(_db, model.FolderPath, newPath);
+                        ConfigurationManager.UpdateProtectionMode(_db, newPath, "LOCKED");
+                        model.FolderPath = newPath;
+                        model.ProtectionMode = ProtectionMode.LOCKED;
+                    }
+                    catch
+                    {
+                    }
+                }
+                else if (model.ProtectionMode == ProtectionMode.LOCKED)
+                {
+                    // unlock
+                    try
+                    {
+                        var restored = await QuickProtectService.QuickUnlockAsync(model.FolderPath).ConfigureAwait(false);
+                        ConfigurationManager.UpdateFolderPath(_db, model.FolderPath, restored);
+                        ConfigurationManager.UpdateProtectionMode(_db, restored, "NORMAL");
+                        model.FolderPath = restored;
+                        model.ProtectionMode = ProtectionMode.NORMAL;
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            else if (action == "Access")
+            {
+                // quick access: create secure workspace and open
+                if (model.ProtectionMode == ProtectionMode.LOCKED)
+                {
+                    try
+                    {
+                        var stw = SecureAccessService.CreateSecureWorkspace();
+                        // placeholder: open folder or stream files into stw
+                    }
+                    catch { }
+                }
+            }
+            else if (action == "Decrypt")
+            {
+                if (model.ProtectionMode == ProtectionMode.ENCRYPTED)
+                {
+                    try
+                    {
+                        string master = null;
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            var dlg = new PasswordPromptWindow("Enter master password to decrypt folder:");
+                            if (dlg.ShowDialog() == true) master = dlg.EnteredPassword;
+                        });
+
+                        if (string.IsNullOrEmpty(master)) return;
+
+                        var progress = new Progress<double>(p => { /* TODO: update UI */ });
+                        await EncryptionService.DecryptFolderAsync(model.FolderPath, master, _db, progress).ConfigureAwait(false);
+                        ConfigurationManager.UpdateProtectionMode(_db, model.FolderPath, "NORMAL");
+                        model.ProtectionMode = ProtectionMode.NORMAL;
+                    }
+                    catch { }
+                }
+            }
+        }
+    }
+}

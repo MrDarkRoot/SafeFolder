@@ -1,0 +1,168 @@
+﻿using Safe1.Models;
+using Safe1.Services;
+using System;
+using System.Collections.ObjectModel;
+using System.Threading.Tasks;
+using System.Windows.Input;
+using System.Windows.Threading;
+using System.Reflection;
+using Microsoft.Data.Sqlite;
+
+namespace Safe1.ViewModels
+{
+    public class MainViewModel : BaseViewModel
+    {
+        public ObservableCollection<ProtectedFolderModel> ProtectedFolders { get; } = new ObservableCollection<ProtectedFolderModel>();
+
+        public ICommand AddFolderCommand { get; }
+        public ICommand HandleFolderActionCommand { get; }
+        public ICommand LockApplicationCommand { get; }
+        public ICommand OpenSettingsCommand { get; }
+
+        private readonly DatabaseManager _db;
+        private readonly SecureAccessService _secureAccess;
+
+        // Auto-lock timer
+        private readonly DispatcherTimer _timer;
+        private TimeSpan _autoLockRemaining;
+        private string _autoLockTimerDisplay;
+
+        public string AutoLockTimerDisplay
+        {
+            get => _autoLockTimerDisplay;
+            set => SetProperty(ref _autoLockTimerDisplay, value);
+        }
+
+        public string AppVersion { get; } = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "1.0.0";
+
+        // External hook: UI can subscribe to this to navigate back to login
+        public event Action? RequestLock;
+
+        public MainViewModel()
+        {
+            var dbKey = ConfigurationManager.RetrieveDatabaseKey();
+            _db = new DatabaseManager(dbKey ?? string.Empty);
+            _db.InitializeDatabase();
+
+            _secureAccess = SecureAccessService.CreateSecureWorkspace();
+
+            AddFolderCommand = new RelayCommand(async (p) => await ExecuteAddFolder());
+            HandleFolderActionCommand = new RelayCommand(async (p) => await ExecuteHandleAction(p));
+            LockApplicationCommand = new RelayCommand((p) => ExecuteLockApplication());
+            OpenSettingsCommand = new RelayCommand((p) => ExecuteOpenSettings());
+
+            // load folders from DB (placeholder)
+            ProtectedFolders.Add(new ProtectedFolderModel { Id = 1, DisplayName = "Documents", FolderPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)), ProtectionMode = ProtectionMode.NORMAL, CreatedAt = DateTime.UtcNow });
+
+            // Initialize auto-lock timer based on CONFIGURATION.timeout_mins
+            int timeoutMins = LoadTimeoutMinutesFromConfig();
+            if (timeoutMins <= 0) timeoutMins = 5; // default 5 minutes
+            _autoLockRemaining = TimeSpan.FromMinutes(timeoutMins);
+            UpdateAutoLockDisplay();
+
+            _timer = new DispatcherTimer();
+            _timer.Interval = TimeSpan.FromSeconds(1);
+            _timer.Tick += Timer_Tick;
+            _timer.Start();
+        }
+
+        private int LoadTimeoutMinutesFromConfig()
+        {
+            try
+            {
+                using (var conn = _db.GetConnection())
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT timeout_mins FROM CONFIGURATION WHERE config_id = $id LIMIT 1;";
+                    cmd.Parameters.AddWithValue("$id", "MASTER");
+                    var obj = cmd.ExecuteScalar();
+                    if (obj != null && obj != DBNull.Value)
+                    {
+                        if (int.TryParse(obj.ToString(), out int val)) return val;
+                    }
+                }
+            }
+            catch
+            {
+                // ignore and use default
+            }
+            return -1;
+        }
+
+        private void Timer_Tick(object? sender, EventArgs e)
+        {
+            if (_autoLockRemaining.TotalSeconds <= 0)
+            {
+                _timer.Stop();
+                // invoke lock
+                ExecuteLockApplication();
+                return;
+            }
+
+            _autoLockRemaining = _autoLockRemaining.Subtract(TimeSpan.FromSeconds(1));
+            UpdateAutoLockDisplay();
+        }
+
+        private void UpdateAutoLockDisplay()
+        {
+            AutoLockTimerDisplay = _autoLockRemaining.ToString(@"hh\:mm\:ss");
+        }
+
+        private void ExecuteLockApplication()
+        {
+            // Signal UI to navigate to login
+            RequestLock?.Invoke();
+            // Stop timer until unlocked
+            _timer.Stop();
+        }
+
+        private void ExecuteOpenSettings()
+        {
+            // TODO: open settings dialog
+        }
+
+        private async Task ExecuteAddFolder()
+        {
+            // Folder selection UI is platform-specific; for now add a demo placeholder path.
+            var demoPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "NewProtectedFolder");
+            ConfigurationManager.AddProtectedFolder(_db, demoPath);
+            ProtectedFolders.Add(new ProtectedFolderModel { Id = ProtectedFolders.Count + 1, DisplayName = System.IO.Path.GetFileName(demoPath), FolderPath = demoPath, ProtectionMode = ProtectionMode.NORMAL, CreatedAt = DateTime.UtcNow });
+
+            // Reset auto-lock timer on user activity
+            ResetAutoLock();
+        }
+
+        private void ResetAutoLock()
+        {
+            int timeoutMins = LoadTimeoutMinutesFromConfig();
+            if (timeoutMins <= 0) timeoutMins = 5;
+            _autoLockRemaining = TimeSpan.FromMinutes(timeoutMins);
+            UpdateAutoLockDisplay();
+            if (!_timer.IsEnabled) _timer.Start();
+        }
+
+        private async Task ExecuteHandleAction(object parameter)
+        {
+            // parameter is the ProtectedFolderModel for the row
+            if (parameter is ProtectedFolderModel model)
+            {
+                // For demo: toggle protection mode
+                if (model.ProtectionMode == ProtectionMode.NORMAL)
+                {
+                    model.ProtectionMode = ProtectionMode.LOCKED;
+                }
+                else if (model.ProtectionMode == ProtectionMode.LOCKED)
+                {
+                    model.ProtectionMode = ProtectionMode.ENCRYPTED;
+                }
+                else
+                {
+                    model.ProtectionMode = ProtectionMode.NORMAL;
+                }
+
+                // Reset auto-lock on activity
+                ResetAutoLock();
+            }
+        }
+    }
+}

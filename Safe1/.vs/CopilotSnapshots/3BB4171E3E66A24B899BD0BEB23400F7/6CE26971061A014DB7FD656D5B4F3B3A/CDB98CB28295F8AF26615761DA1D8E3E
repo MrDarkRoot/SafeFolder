@@ -1,0 +1,70 @@
+﻿using Safe1.Models;
+using Safe1.Services;
+using System;
+using System.Collections.ObjectModel;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Windows.Input;
+
+namespace Safe1.ViewModels
+{
+    public class MainViewModel : BaseViewModel
+    {
+        public ObservableCollection<ProtectedFolderModel> ProtectedFolders { get; } = new ObservableCollection<ProtectedFolderModel>();
+
+        public ICommand AddFolderCommand { get; }
+        public ICommand HandleFolderActionCommand { get; }
+
+        private readonly DatabaseManager _db;
+        private readonly SecureAccessService _secureAccess;
+
+        public MainViewModel()
+        {
+            var dbKey = ConfigurationManager.RetrieveDatabaseKey();
+            _db = new DatabaseManager(dbKey ?? string.Empty);
+            _db.InitializeDatabase();
+
+            _secureAccess = SecureAccessService.CreateSecureWorkspace();
+
+            AddFolderCommand = new RelayCommand(async (p) => await ExecuteAddFolder());
+            HandleFolderActionCommand = new RelayCommand(async (p) => await ExecuteHandleAction(p));
+
+            // load folders from DB (placeholder)
+            ProtectedFolders.Add(new ProtectedFolderModel { Id = 1, DisplayName = "Documents", FolderPath = "C:\\Users\\Public\\Documents", ProtectionMode = ProtectionMode.NORMAL, CreatedAt = DateTime.UtcNow });
+        }
+
+        private async Task ExecuteAddFolder()
+        {
+            using (var dlg = new FolderBrowserDialog())
+            {
+                if (dlg.ShowDialog() == DialogResult.OK)
+                {
+                    // Persist
+                    ConfigurationManager.AddProtectedFolder(_db, dlg.SelectedPath);
+                    ProtectedFolders.Add(new ProtectedFolderModel { Id = ProtectedFolders.Count + 1, DisplayName = System.IO.Path.GetFileName(dlg.SelectedPath), FolderPath = dlg.SelectedPath, ProtectionMode = ProtectionMode.NORMAL, CreatedAt = DateTime.UtcNow });
+                }
+            }
+        }
+
+        private async Task ExecuteHandleAction(object parameter)
+        {
+            // parameter is the ProtectedFolderModel for the row
+            if (parameter is ProtectedFolderModel model)
+            {
+                // For demo: toggle protection mode
+                if (model.ProtectionMode == ProtectionMode.NORMAL)
+                {
+                    model.ProtectionMode = ProtectionMode.LOCKED;
+                }
+                else if (model.ProtectionMode == ProtectionMode.LOCKED)
+                {
+                    model.ProtectionMode = ProtectionMode.ENCRYPTED;
+                }
+                else
+                {
+                    model.ProtectionMode = ProtectionMode.NORMAL;
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,140 @@
+﻿using Microsoft.Data.Sqlite;
+using Microsoft.Win32;
+using Safe1.Services;
+using System;
+using System.Collections.Generic;
+
+namespace Safe1.Services
+{
+    /// <summary>
+    /// ConfigurationManager handles secure storage of the SQLCipher database key (via DPAPI)
+    /// and ensures protected schema elements exist (such as PROTECTED_FOLDER table).
+    /// </summary>
+    public static class ConfigurationManager
+    {
+        private const string RegistryPath = "SOFTWARE\\SafeFolder";
+        private const string RegistryValueName = "EncryptedDbKey";
+
+        /// <summary>
+        /// Securely store the SQLCipher database key using DPAPI (via SecretManager) in HKCU registry.
+        /// The key is protected per-user and stored as a Base64 string.
+        /// </summary>
+        public static void StoreDatabaseKey(string plainKey)
+        {
+            if (string.IsNullOrEmpty(plainKey)) throw new ArgumentNullException(nameof(plainKey));
+
+            var protectedValue = SecretManager.Protect(plainKey);
+            if (protectedValue == null) throw new InvalidOperationException("Failed to protect database key.");
+
+            using (var key = Registry.CurrentUser.CreateSubKey(RegistryPath))
+            {
+                if (key == null) throw new InvalidOperationException("Unable to access registry to store DB key.");
+                key.SetValue(RegistryValueName, protectedValue, RegistryValueKind.String);
+            }
+        }
+
+        /// <summary>
+        /// Retrieve and unprotect the database key from registry. Returns null if not found or on failure.
+        /// </summary>
+        public static string RetrieveDatabaseKey()
+        {
+            try
+            {
+                using (var key = Registry.CurrentUser.OpenSubKey(RegistryPath))
+                {
+                    if (key == null) return null;
+                    var protectedValue = key.GetValue(RegistryValueName) as string;
+                    if (string.IsNullOrEmpty(protectedValue)) return null;
+                    var unprotected = SecretManager.Unprotect(protectedValue);
+                    return unprotected;
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Ensure the PROTECTED_FOLDER table exists with a UNIQUE constraint on folder_path.
+        /// </summary>
+        public static void EnsureProtectedFolderTable(DatabaseManager db)
+        {
+            if (db == null) throw new ArgumentNullException(nameof(db));
+
+            using (var conn = db.GetConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"
+CREATE TABLE IF NOT EXISTS PROTECTED_FOLDER (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    folder_path TEXT NOT NULL UNIQUE,
+    display_name TEXT,
+    created_at TEXT
+);";
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Add a protected folder record. Returns true if inserted, false if it already exists.
+        /// </summary>
+        public static bool AddProtectedFolder(DatabaseManager db, string folderPath, string displayName = null)
+        {
+            if (db == null) throw new ArgumentNullException(nameof(db));
+            if (string.IsNullOrEmpty(folderPath)) throw new ArgumentNullException(nameof(folderPath));
+
+            using (var conn = db.GetConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"INSERT OR IGNORE INTO PROTECTED_FOLDER (folder_path, display_name, created_at) VALUES ($path, $name, $created);";
+                cmd.Parameters.AddWithValue("$path", folderPath);
+                cmd.Parameters.AddWithValue("$name", displayName ?? (object)DBNull.Value);
+                cmd.Parameters.AddWithValue("$created", DateTime.UtcNow.ToString("o"));
+                var rows = cmd.ExecuteNonQuery();
+                return rows > 0;
+            }
+        }
+
+        /// <summary>
+        /// Remove a protected folder record by path.
+        /// </summary>
+        public static void RemoveProtectedFolder(DatabaseManager db, string folderPath)
+        {
+            if (db == null) throw new ArgumentNullException(nameof(db));
+            if (string.IsNullOrEmpty(folderPath)) throw new ArgumentNullException(nameof(folderPath));
+
+            using (var conn = db.GetConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "DELETE FROM PROTECTED_FOLDER WHERE folder_path = $path;";
+                cmd.Parameters.AddWithValue("$path", folderPath);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Get all protected folder paths.
+        /// </summary>
+        public static List<string> GetProtectedFolders(DatabaseManager db)
+        {
+            var list = new List<string>();
+            if (db == null) return list;
+
+            using (var conn = db.GetConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT folder_path FROM PROTECTED_FOLDER ORDER BY id;";
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        if (!reader.IsDBNull(0)) list.Add(reader.GetString(0));
+                    }
+                }
+            }
+
+            return list;
+        }
+    }
+}

@@ -1,0 +1,40 @@
+﻿using System.Text;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+
+namespace Safe1
+{
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        public MainWindow()
+        {
+            InitializeComponent();
+            int testInput = 10;
+            try
+            {
+                // Gọi hàm C++ thông qua NativeMethods
+                int result = NativeMethods.TestPInvokeConnection(testInput);
+
+                MessageBox.Show($"P/Invoke THÀNH CÔNG! C# gửi {testInput}, C++ trả về {result}",
+                                "Kết nối C++", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show($"LỖI P/INVOKE: {ex.Message}. Vui lòng kiểm tra lại: 1. Đã build C++ DLL chưa? 2. Lệnh xcopy có đúng không?",
+                                "Lỗi Kết nối", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+
+
+        }
+    }
+}

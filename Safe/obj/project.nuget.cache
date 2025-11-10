@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "dgSpecHash": "tKhfClC7fMY=",
+  "success": true,
+  "projectFilePath": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\Safe\\Safe.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Administrator\\.nuget\\packages\\communitytoolkit.mvvm\\8.4.0\\communitytoolkit.mvvm.8.4.0.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\mahapps.metro.iconpacks.core\\6.2.1\\mahapps.metro.iconpacks.core.6.2.1.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\mahapps.metro.iconpacks.material\\6.2.1\\mahapps.metro.iconpacks.material.6.2.1.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\system.text.json\\8.0.5\\system.text.json.8.0.5.nupkg.sha512"
+  ],
+  "logs": []
+}

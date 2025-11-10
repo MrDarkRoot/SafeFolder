@@ -1,0 +1,156 @@
+﻿using System;
+using System.IO;
+using System.Security.AccessControl;
+using System.Security.Principal;
+using System.Threading.Tasks;
+using System.Security.Cryptography;
+
+namespace Safe1.Services
+{
+    public class SecureAccessService : IDisposable
+    {
+        private readonly string _workspacePath;
+        private bool _disposed;
+
+        private SecureAccessService(string workspacePath)
+        {
+            _workspacePath = workspacePath;
+        }
+
+        /// <summary>
+        /// Create a Secure Temporary Workspace with a unique folder in user's temp.
+        /// Applies restrictive ACLs so only the current user & process (best-effort) can access it.
+        /// Returns an instance that should be disposed to clean up.
+        /// </summary>
+        public static SecureAccessService CreateSecureWorkspace()
+        {
+            var temp = Path.GetTempPath();
+            var folder = Path.Combine(temp, "SafeFolder_STW_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+
+            // Apply ACL: remove existing rules and set explicit allow for current user only
+            try
+            {
+                var dirInfo = new DirectoryInfo(folder);
+                var dirSec = new DirectorySecurity();
+
+                // Deny Everyone
+                var everyone = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
+                var denyRule = new FileSystemAccessRule(everyone, FileSystemRights.FullControl, AccessControlType.Deny);
+                dirSec.AddAccessRule(denyRule);
+
+                // Allow current user full control
+                var currentUserSid = WindowsIdentity.GetCurrent()?.User;
+                if (currentUserSid != null)
+                {
+                    var allowRule = new FileSystemAccessRule(currentUserSid, FileSystemRights.FullControl, AccessControlType.Allow);
+                    dirSec.AddAccessRule(allowRule);
+                }
+
+                dirInfo.SetAccessControl(dirSec);
+            }
+            catch
+            {
+                // Best-effort: if ACLs fail, fall back to folder-only protections
+            }
+
+            return new SecureAccessService(folder);
+        }
+
+        /// <summary>
+        /// Open a file in the secure workspace for streaming decryption. Exclusive lock is applied via FileShare.None.
+        /// Caller should dispose returned stream when done and then call SecureDelete to remove file securely.
+        /// </summary>
+        public FileStream OpenForStreaming(string fileName)
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(SecureAccessService));
+            var path = Path.Combine(_workspacePath, fileName);
+            // Create an empty file and open with exclusive access
+            var fs = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            return fs;
+        }
+
+        /// <summary>
+        /// Securely overwrite and delete a file in the workspace. Uses a simple 3-pass overwrite (random, complement, random).
+        /// </summary>
+        public void SecureDelete(string fileName)
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(SecureAccessService));
+            var path = Path.Combine(_workspacePath, fileName);
+            if (!File.Exists(path)) return;
+
+            try
+            {
+                var fileInfo = new FileInfo(path);
+                long len = fileInfo.Length;
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None))
+                {
+                    using (var rng = RandomNumberGenerator.Create())
+                    {
+                        byte[] buffer = new byte[8192];
+
+                        // Pass 1: random data
+                        fs.Position = 0;
+                        long remaining = len;
+                        while (remaining > 0)
+                        {
+                            int toWrite = (int)Math.Min(buffer.Length, remaining);
+                            rng.GetBytes(buffer, 0, toWrite);
+                            fs.Write(buffer, 0, toWrite);
+                            remaining -= toWrite;
+                        }
+                        fs.Flush(true);
+
+                        // Pass 2: complement (0xFF)
+                        fs.Position = 0;
+                        remaining = len;
+                        while (remaining > 0)
+                        {
+                            int toWrite = (int)Math.Min(buffer.Length, remaining);
+                            // fill with 0xFF
+                            for (int i = 0; i < toWrite; ++i) buffer[i] = 0xFF;
+                            fs.Write(buffer, 0, toWrite);
+                            remaining -= toWrite;
+                        }
+                        fs.Flush(true);
+
+                        // Pass 3: random data
+                        fs.Position = 0;
+                        remaining = len;
+                        while (remaining > 0)
+                        {
+                            int toWrite = (int)Math.Min(buffer.Length, remaining);
+                            rng.GetBytes(buffer, 0, toWrite);
+                            fs.Write(buffer, 0, toWrite);
+                            remaining -= toWrite;
+                        }
+                        fs.Flush(true);
+                    }
+                }
+
+                // Remove file
+                File.Delete(path);
+            }
+            catch
+            {
+                // best effort
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            try
+            {
+                // Attempt to delete remaining files and directory
+                foreach (var f in Directory.EnumerateFiles(_workspacePath))
+                {
+                    try { File.Delete(f); } catch { }
+                }
+                try { Directory.Delete(_workspacePath, true); } catch { }
+            }
+            catch { }
+            _disposed = true;
+        }
+    }
+}

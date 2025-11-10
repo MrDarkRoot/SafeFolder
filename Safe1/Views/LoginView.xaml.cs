@@ -1,0 +1,85 @@
+using Safe1.ViewModels;
+using System;
+using System.Windows.Controls;
+using Safe1.Services;
+using Safe1.Views;
+
+namespace Safe1.Views
+{
+    public partial class LoginView : UserControl
+    {
+        public LoginView()
+        {
+            InitializeComponent();
+
+            try
+            {
+                var dbKey = ConfigurationManager.RetrieveDatabaseKey();
+                var dbManager = new DatabaseManager(dbKey ?? string.Empty);
+                dbManager.InitializeDatabase();
+
+                var auth = new AuthService(dbManager);
+
+                if (!auth.IsMasterConfigured())
+                {
+                    // Show create master password UI
+                    var createVm = new CreateMasterPasswordViewModel(auth);
+                    createVm.Created += () =>
+                    {
+                        // After creating master password, replace content with login view model
+                        Dispatcher.Invoke(() =>
+                        {
+                            var vm = new LoginViewModel();
+                            this.DataContext = vm;
+
+                            // wire password change to VM
+                            this.PasswordBox.PasswordChanged += (s, e) => vm.MasterPassword = this.PasswordBox.Password;
+                        });
+                    };
+
+                    var createView = new CreateMasterPasswordView(createVm);
+                    this.RootGrid.Children.Clear();
+                    this.RootGrid.Children.Add(createView);
+                }
+                else
+                {
+                    var vm = new LoginViewModel();
+                    this.DataContext = vm;
+
+                    // wire password change to VM
+                    this.PasswordBox.PasswordChanged += (s, e) => vm.MasterPassword = this.PasswordBox.Password;
+                }
+            }
+            catch (Exception ex)
+            {
+                // show minimal error UI
+                this.RootGrid.Children.Clear();
+                this.RootGrid.Children.Add(new TextBlock { Text = "Failed to initialize Login view: " + ex.Message });
+            }
+        }
+
+        private void Button_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            try
+            {
+                var vm = this.DataContext as LoginViewModel;
+                if (vm == null) return;
+
+                // Ensure VM has the latest password
+                var pwd = this.PasswordBox?.Password;
+                if (pwd != null) vm.MasterPassword = pwd;
+
+                // Prefer calling the bound command
+                var cmd = vm.LoginCommand;
+                if (cmd != null && cmd.CanExecute(pwd))
+                {
+                    cmd.Execute(pwd);
+                }
+            }
+            catch
+            {
+                // swallow to avoid UI crash
+            }
+        }
+    }
+}

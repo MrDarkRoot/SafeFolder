@@ -1,0 +1,117 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFix\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{17BA3BCC-E290-46F9-BB1C-DACA32E917FC}|..\\SafeFolderNativeCrypto\\SafeFolderNativeCrypto.vcxproj|D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFolderNativeCrypto\\CryptoInterop.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{17BA3BCC-E290-46F9-BB1C-DACA32E917FC}|..\\SafeFolderNativeCrypto\\SafeFolderNativeCrypto.vcxproj|D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFolderNativeCrypto\\CryptoInterop.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{17BA3BCC-E290-46F9-BB1C-DACA32E917FC}|..\\SafeFolderNativeCrypto\\SafeFolderNativeCrypto.vcxproj|D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFolderNativeCrypto\\dllmain.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{17BA3BCC-E290-46F9-BB1C-DACA32E917FC}|..\\SafeFolderNativeCrypto\\SafeFolderNativeCrypto.vcxproj|D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFolderNativeCrypto\\pch.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E3D4A592-72B2-4D49-A4AC-6D52F4597BEA}|SafeFix.csproj|d:\\daihoc\\laptrinh\\doanchuyennganh\\safefix\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{E3D4A592-72B2-4D49-A4AC-6D52F4597BEA}|SafeFix.csproj|solutionrelative:mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E3D4A592-72B2-4D49-A4AC-6D52F4597BEA}|SafeFix.csproj|d:\\daihoc\\laptrinh\\doanchuyennganh\\safefix\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E3D4A592-72B2-4D49-A4AC-6D52F4597BEA}|SafeFix.csproj|solutionrelative:mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "CryptoInterop.cpp",
+              "DocumentMoniker": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFolderNativeCrypto\\CryptoInterop.cpp",
+              "RelativeDocumentMoniker": "..\\SafeFolderNativeCrypto\\CryptoInterop.cpp",
+              "ToolTip": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFolderNativeCrypto\\CryptoInterop.cpp",
+              "RelativeToolTip": "..\\SafeFolderNativeCrypto\\CryptoInterop.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAAARAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2025-11-09T15:22:26.334Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "CryptoInterop.h",
+              "DocumentMoniker": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFolderNativeCrypto\\CryptoInterop.h",
+              "RelativeDocumentMoniker": "..\\SafeFolderNativeCrypto\\CryptoInterop.h",
+              "ToolTip": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFolderNativeCrypto\\CryptoInterop.h",
+              "RelativeToolTip": "..\\SafeFolderNativeCrypto\\CryptoInterop.h",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2025-11-09T15:21:55.442Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "pch.cpp",
+              "DocumentMoniker": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFolderNativeCrypto\\pch.cpp",
+              "RelativeDocumentMoniker": "..\\SafeFolderNativeCrypto\\pch.cpp",
+              "ToolTip": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFolderNativeCrypto\\pch.cpp",
+              "RelativeToolTip": "..\\SafeFolderNativeCrypto\\pch.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2025-11-09T15:20:48.611Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "dllmain.cpp",
+              "DocumentMoniker": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFolderNativeCrypto\\dllmain.cpp",
+              "RelativeDocumentMoniker": "..\\SafeFolderNativeCrypto\\dllmain.cpp",
+              "ToolTip": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFolderNativeCrypto\\dllmain.cpp",
+              "RelativeToolTip": "..\\SafeFolderNativeCrypto\\dllmain.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2025-11-09T15:14:12.778Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "MainWindow.xaml",
+              "DocumentMoniker": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFix\\MainWindow.xaml",
+              "RelativeDocumentMoniker": "MainWindow.xaml",
+              "ToolTip": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFix\\MainWindow.xaml",
+              "RelativeToolTip": "MainWindow.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-11-09T15:12:39.709Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "MainWindow.xaml.cs",
+              "DocumentMoniker": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFix\\MainWindow.xaml.cs",
+              "RelativeDocumentMoniker": "MainWindow.xaml.cs",
+              "ToolTip": "D:\\Daihoc\\Laptrinh\\DoAnChuyenNganh\\SafeFix\\MainWindow.xaml.cs",
+              "RelativeToolTip": "MainWindow.xaml.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-09T15:12:37.9Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

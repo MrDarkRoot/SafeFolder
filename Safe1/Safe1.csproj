@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <Platforms>AnyCPU;x86;x64</Platforms>
+    <!-- Force managed process to 64-bit by default to match native x64 DLL produced in workspace -->
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.10" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlcipher" Version="2.1.11" />
+    <PackageReference Include="SQLitePCLRaw.core" Version="3.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Views\Converters\" />
+  </ItemGroup>
+
+  <!-- Post-build: copy native DLL matching the managed process bitness -->
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <PropertyGroup>
+      <NativeDllName>SafeFolder.NativeCrypto.dll</NativeDllName>
+      <!-- Include actual native output observed in workspace: solution-root x64\Debug -->
+      <PossibleNativePaths>$(SolutionDir)x64\$(Configuration)\$(NativeDllName);$(SolutionDir)SafeFolder.NativeCrypto\x64\$(Configuration)\$(NativeDllName);$(SolutionDir)SafeFolder.NativeCrypto\$(Platform)\$(Configuration)\$(NativeDllName);$(SolutionDir)SafeFolder.NativeCrypto\$(Configuration)\$(Platform)\$(NativeDllName);$(SolutionDir)SafeFolder.NativeCrypto\$(Configuration)\$(NativeDllName);$(SolutionDir)SafeFolder.NativeCrypto\$(NativeDllName)</PossibleNativePaths>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <NativeCandidates Include="$(PossibleNativePaths)" />
+      <ExistingNative Include="@(NativeCandidates)" Condition="Exists('%(NativeCandidates.Identity)')" />
+    </ItemGroup>
+
+    <Message Importance="High" Text="Found native DLL(s): @(ExistingNative)" Condition="@(ExistingNative) != ''" />
+
+    <Copy SourceFiles="@(ExistingNative)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="@(ExistingNative) != ''" />
+
+    <Warning Text="Native DLL not found in expected locations: $(PossibleNativePaths)" Condition="@(ExistingNative) == ''" />
+  </Target>
+
+</Project>

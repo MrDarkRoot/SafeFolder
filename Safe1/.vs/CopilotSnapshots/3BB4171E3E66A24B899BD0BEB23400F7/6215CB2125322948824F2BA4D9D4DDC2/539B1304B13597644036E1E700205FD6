@@ -1,0 +1,194 @@
+﻿using Microsoft.Data.Sqlite;
+using System;
+using System.Data;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Safe1.Services
+{
+    /// <summary>
+    /// AuthService handles master password setup and verification.
+    /// - Uses PBKDF2-HMAC-SHA256 with at least 310,000 iterations and 32-byte salt.
+    /// - Stores base64 hash and salt in CONFIGURATION table (config_id = 'MASTER').
+    /// - Performs constant-time comparison and exponential brute-force delay after 3 failures.
+    /// </summary>
+    public class AuthService
+    {
+        private readonly DatabaseManager _db;
+        private const string ConfigId = "MASTER";
+        private const int SaltSize = 32; // 32 bytes
+        private const int HashSize = 32; // 32 bytes (256 bits)
+        private const int MinIterations = 310000;
+
+        public AuthService(DatabaseManager db)
+        {
+            _db = db ?? throw new ArgumentNullException(nameof(db));
+        }
+
+        /// <summary>
+        /// Set the master password. Generates a random 32-byte salt and derives a 32-byte hash
+        /// using PBKDF2-HMAC-SHA256 with a minimum of 310,000 iterations. Stores values in DB.
+        /// Returns true on success.
+        /// </summary>
+        public async Task<bool> SetMasterPasswordAsync(string password)
+        {
+            if (string.IsNullOrWhiteSpace(password)) return false;
+
+            // Generate salt
+            var salt = new byte[SaltSize];
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(salt);
+            }
+
+            int iterations = MinIterations;
+
+            // Derive hash
+            byte[] hash;
+            using (var derive = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256))
+            {
+                hash = derive.GetBytes(HashSize);
+            }
+
+            string saltB64 = Convert.ToBase64String(salt);
+            string hashB64 = Convert.ToBase64String(hash);
+
+            // Store into DB (insert or update)
+            using (var conn = _db.GetConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"
+INSERT INTO CONFIGURATION (config_id, master_hash, salt, iterations, timeout_mins, failed_attempts, last_failed_at)
+VALUES ($id, $hash, $salt, $iter, NULL, 0, NULL)
+ON CONFLICT(config_id) DO UPDATE SET
+    master_hash = $hash,
+    salt = $salt,
+    iterations = $iter,
+    failed_attempts = 0,
+    last_failed_at = NULL;";
+                cmd.Parameters.AddWithValue("$id", ConfigId);
+                cmd.Parameters.AddWithValue("$hash", hashB64);
+                cmd.Parameters.AddWithValue("$salt", saltB64);
+                cmd.Parameters.AddWithValue("$iter", iterations);
+
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Verify an input password against the stored master password.
+        /// Implements constant-time comparison and an exponential delay after repeated failures.
+        /// </summary>
+        public async Task<bool> VerifyMasterPasswordAsync(string password)
+        {
+            if (string.IsNullOrEmpty(password)) return false;
+
+            // Load configuration row
+            string storedHashB64 = null;
+            string storedSaltB64 = null;
+            int iterations = MinIterations;
+            int failedAttempts = 0;
+            DateTime? lastFailedAt = null;
+
+            using (var conn = _db.GetConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT master_hash, salt, iterations, failed_attempts, last_failed_at FROM CONFIGURATION WHERE config_id = $id LIMIT 1;";
+                cmd.Parameters.AddWithValue("$id", ConfigId);
+
+                using (var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false))
+                {
+                    if (!await reader.ReadAsync().ConfigureAwait(false))
+                    {
+                        // No master password configured
+                        return false;
+                    }
+
+                    storedHashB64 = reader.IsDBNull(0) ? null : reader.GetString(0);
+                    storedSaltB64 = reader.IsDBNull(1) ? null : reader.GetString(1);
+                    if (!reader.IsDBNull(2)) iterations = reader.GetInt32(2);
+                    if (!reader.IsDBNull(3)) failedAttempts = reader.GetInt32(3);
+                    if (!reader.IsDBNull(4))
+                    {
+                        var lastFailedStr = reader.GetString(4);
+                        if (DateTime.TryParse(lastFailedStr, out var dt)) lastFailedAt = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(storedHashB64) || string.IsNullOrEmpty(storedSaltB64))
+            {
+                return false;
+            }
+
+            // Brute-force defense: if there are >=3 consecutive failures, apply exponential delay
+            if (failedAttempts >= 3 && lastFailedAt.HasValue)
+            {
+                // Delay grows exponentially with failures: attempt 3 -> 2s, 4 -> 4s, 5 -> 8s, etc.
+                double delaySeconds = Math.Pow(2, failedAttempts - 2);
+                var elapsed = DateTime.UtcNow - lastFailedAt.Value;
+                var remaining = TimeSpan.FromSeconds(delaySeconds) - elapsed;
+                if (remaining > TimeSpan.Zero)
+                {
+                    // Wait the remaining penalty time before proceeding
+                    await Task.Delay(remaining).ConfigureAwait(false);
+                }
+            }
+
+            // Recompute hash using stored salt and iterations
+            byte[] salt;
+            try
+            {
+                salt = Convert.FromBase64String(storedSaltB64);
+            }
+            catch
+            {
+                return false;
+            }
+
+            byte[] computedHash;
+            using (var derive = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256))
+            {
+                computedHash = derive.GetBytes(HashSize);
+            }
+
+            byte[] storedHash;
+            try
+            {
+                storedHash = Convert.FromBase64String(storedHashB64);
+            }
+            catch
+            {
+                return false;
+            }
+
+            bool match = CryptographicOperations.FixedTimeEquals(computedHash, storedHash);
+
+            // Update failure counters
+            using (var conn = _db.GetConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                if (match)
+                {
+                    cmd.CommandText = "UPDATE CONFIGURATION SET failed_attempts = 0, last_failed_at = NULL WHERE config_id = $id;";
+                    cmd.Parameters.AddWithValue("$id", ConfigId);
+                    await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    return true;
+                }
+                else
+                {
+                    int newFailed = failedAttempts + 1;
+                    cmd.CommandText = "UPDATE CONFIGURATION SET failed_attempts = $failed, last_failed_at = $last WHERE config_id = $id;";
+                    cmd.Parameters.AddWithValue("$failed", newFailed);
+                    cmd.Parameters.AddWithValue("$last", DateTime.UtcNow.ToString("o"));
+                    cmd.Parameters.AddWithValue("$id", ConfigId);
+                    await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    return false;
+                }
+            }
+        }
+    }
+}
