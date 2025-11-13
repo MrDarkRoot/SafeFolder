@@ -1,7 +1,0 @@
-﻿
-#include "pch.h" 
-extern "C" __declspec(dllexport)
-int TestPInvokeConnection(int value)
-{
-    return value + 99; 
-}
